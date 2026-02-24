@@ -1,10 +1,14 @@
 ﻿using BusinessLogicLayer.Infrastructure;
+using BusinessLogicLayer.Services;
 using DataAccessLayer.Data;
+using DataAccessLayer.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
+using System.Security.Claims;
 
 namespace BusinessLogicLayer.Middleware
 {
@@ -62,12 +66,27 @@ namespace BusinessLogicLayer.Middleware
                 using (var scope = _scopeFactory.CreateScope())
                 {
                     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    var contextAccessor = scope.ServiceProvider.GetRequiredService<ContextAccessorService>();
 
                     var isBlacklisted = await dbContext.TokenBlacklists.AnyAsync(t => t.Token == token);
+                    var userId = contextAccessor.GetCurrentUserId();
+                    var dbUser = await dbContext.Users.FindAsync(userId);
 
                     if (isBlacklisted)
                     {
                         var response = "Token has been revoked/logged out.";
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsJsonAsync(new
+                        {
+                            error = response
+                        });
+                        return;
+                    }
+
+                    if (dbUser != null && (dbUser.IsDeactivated || dbUser.IsDeactivatedByAdmin))
+                    {
+                        var response = "This account has been banned/deactivated";
                         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                         context.Response.ContentType = "application/json";
                         await context.Response.WriteAsJsonAsync(new

@@ -127,7 +127,7 @@ builder.Services.AddAuthentication(options =>
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
 
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/userHub"))
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/api/user-hub"))
                 {// If the request is for our hub, grab the token from the query string
                     context.Token = accessToken;
                 }
@@ -199,13 +199,15 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHub<UserHub>("/api/userHub"); // The endpoint your Flutter app will connect to
+app.MapHub<UserHub>("/api/user-hub"); // The endpoint your Flutter app will connect to
 
 // Replace: ApplicationDbInitializer.SeedRoles(app).Wait();
 // Replace: ApplicationDbInitializer.SeedAdmin(app).Wait();
 
 using (var scope = app.Services.CreateScope())
 {
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    context.Database.Migrate();
     var services = scope.ServiceProvider;
     try
     {
