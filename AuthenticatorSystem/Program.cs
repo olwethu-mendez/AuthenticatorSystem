@@ -24,7 +24,7 @@ builder.Services.AddScoped<ContextAccessorService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<R2Service>();
 
-builder.Services.AddSingleton<ISmsService,TwilioSmsService>();
+builder.Services.AddSingleton<ISmsService, TwilioSmsService>();
 builder.Services.AddSingleton<IEmailService, MailtrapService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHttpClient();
@@ -170,16 +170,25 @@ CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 
 var app = builder.Build();
 
+//app.UseCors(options =>
+//options.WithOrigins(
+//        "https://localhost:3000",
+//        "http://localhost:3000",
+//        "http://10.0.2.2:5233",         // For Android Emulator (if your backend is also on 5233, usually just 10.0.2.2)
+//        "http://127.0.0.1:5233"        // For iOS Simulator
+//)
+//.AllowAnyMethod()
+//.AllowAnyHeader()
+//.AllowCredentials()
+//); // Also relevant for SignalR Hubs
+
+
 app.UseCors(options =>
-options.WithOrigins(
-        "https://localhost:3000",
-        "http://localhost:3000",
-        "http://10.0.2.2:5233",         // For Android Emulator (if your backend is also on 5233, usually just 10.0.2.2)
-        "http://127.0.0.1:5233"        // For iOS Simulator
-)
+options.SetIsOriginAllowed(origin => true)
 .AllowAnyMethod()
 .AllowAnyHeader()
-.AllowCredentials()); // Also relevant for SignalR Hubs
+.AllowCredentials()
+); // Also relevant for SignalR Hubs
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment() ||
