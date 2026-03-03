@@ -126,6 +126,7 @@ namespace BusinessLogicLayer.Services
                 imageFolder = "organization_header_image/";
             else imageFolder = string.Empty;
 
+            //make this dynamic somehow
             if (_context.Profiles.Any(x => x.ProfilePictureName == fileName))
             {
                 string uniqueSuffix = $"_{DateTime.UtcNow:yyyyMMddHHmmss}";

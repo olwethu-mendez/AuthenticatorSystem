@@ -113,8 +113,8 @@ namespace BusinessLogicLayer.Services
 
         public async Task<GetOrganisationDto> GetOrganisation(string organizationId)
         {
-            var organisation = await _context.Organisations.FirstOrDefaultAsync(x => x.Id == organizationId); 
-            if(organisation == null)
+            var organisation = await _context.Organisations.FirstOrDefaultAsync(x => x.Id == organizationId);
+            if (organisation == null)
                 throw new ClientError(404, "Organisation not found");
             var organisationDto = new GetOrganisationDto
             {
@@ -129,15 +129,27 @@ namespace BusinessLogicLayer.Services
 
         }
 
-        public async Task InviteUserToDomain(string profileId, string organisationId)
+        public async Task InviteUserToDomain(string profileId)
         {
-            var profile = await _context.Profiles.FirstOrDefaultAsync(p => p.Id == profileId);
-            if (profile == null) throw new ClientError(404, "Selected Profile not found");
+            await ValidateTenantAccess(requireAdmin: true);
+
+            var tenantId = _contextAccessorService.GetRequestHeaders("X-Tenant-Id");
+
+            var profile = await _context.Profiles
+                .FirstOrDefaultAsync(p => p.Id == profileId);
+
+            if (profile == null)
+                throw new ClientError(404, "Profile not found.");
+
             _context.ProfileOrganisations.Add(new ProfileOrganisation
             {
                 ProfileId = profileId,
-                OrganisationId = organisationId,
+                OrganisationId = tenantId!,
+                InvitationAccepted = null,
+                IsOrgAdmin = false
             });
+
+            await _context.SaveChangesAsync();
         }
 
         private async Task<Dictionary<string, string>> InitialImageUpload(IFormFile formFile, string imageType)
@@ -154,6 +166,62 @@ namespace BusinessLogicLayer.Services
                 { "url", result },
                 { "name", profilePictureName }
             };
+        }
+
+        public async Task<List<GetMyOrganisationDto>> GetMyOrganisations()
+        {
+            await ValidateTenantAccess(requireAdmin: true);
+
+            var currentUserId = _contextAccessorService.GetCurrentUserId();
+            if (currentUserId == null)
+                throw new ClientError(401, "Failed to retrieve currently authenticated user");
+
+            var profile = await _context.Profiles
+                .FirstOrDefaultAsync(p => p.UserId == currentUserId);
+
+            if (profile == null)
+                throw new ClientError(404, "Current User Profile not found");
+
+            var organisations = await _context.ProfileOrganisations
+                .Where(po => po.ProfileId == profile.Id && po.InvitationAccepted == true)
+                .Select(po => new GetMyOrganisationDto
+                {
+                    OrganizationId = po.Organisation.Id,
+                    Name = po.Organisation.Name,
+                    Subdomain = po.Organisation.Subdomain,
+                    OrganizationImageUrl = po.Organisation.OrganizationImageUrl,
+                    OrganizationHeaderImageUrl = po.Organisation.OrganizationHeaderImageUrl,
+                    IsAdmin = po.IsOrgAdmin
+                })
+                .ToListAsync();
+
+            return organisations;
+        }
+
+        private async Task<ProfileOrganisation> ValidateTenantAccess(bool requireAdmin = false)
+        {
+            var tenantId = _contextAccessorService.GetRequestHeaders("X-Tenant-Id");
+            if (string.IsNullOrEmpty(tenantId))
+                throw new ClientError(400, "Tenant header required.");
+
+            var currentUserId = _contextAccessorService.GetCurrentUserId();
+            if (currentUserId == null)
+                throw new ClientError(401, "User not authenticated.");
+
+            var membership = await _context.ProfileOrganisations
+                .Include(po => po.Profile)
+                .FirstOrDefaultAsync(po =>
+                    po.OrganisationId == tenantId &&
+                    po.Profile.UserId == currentUserId &&
+                    po.InvitationAccepted == true);
+
+            if (membership == null)
+                throw new ClientError(403, "Access denied to this organisation.");
+
+            if (requireAdmin && membership.IsOrgAdmin != true)
+                throw new ClientError(403, "Admin privileges required.");
+
+            return membership;
         }
 
         /*private async Task<Dictionary<string, string>> UploadImage(Organisation org, IFormFile formFile, string imageType)

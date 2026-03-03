@@ -7,9 +7,10 @@ namespace DataAccessLayer.Data
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         private readonly ITenantService _tenantService;
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ITenantService tenantService)
             : base(options)
         {
+            _tenantService = tenantService;
         }
         public DbSet<ApplicationUser> ApplicationUsers { get; set; }
         public DbSet<Organisation> Organisations { get; set; }

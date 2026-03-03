@@ -13,6 +13,7 @@ namespace BusinessLogicLayer.DTOs.User
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? Username { get; set; }
+        public List<string>? Roles { get; set; }
         public string? EmailAddress { get; set; }
         public bool? EmailConfirmed { get; set; }
         public string? PhoneNumber { get; set; }
