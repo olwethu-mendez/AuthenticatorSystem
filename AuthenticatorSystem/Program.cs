@@ -20,18 +20,21 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IUsersService, UsersService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IOrganisationService, OrganisationService>();
 builder.Services.AddScoped<ContextAccessorService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<R2Service>();
 
 builder.Services.AddSingleton<ISmsService, TwilioSmsService>();
 builder.Services.AddSingleton<IEmailService, MailtrapService>();
+
+builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHttpClient();
 builder.Services.AddLogging();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddControllers();
-builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddSwaggerGen(c =>
@@ -46,6 +49,13 @@ builder.Services.AddSwaggerGen(c =>
         BearerFormat = "JWT",
         Scheme = "Bearer"
     });
+    c.AddSecurityDefinition("Tenant ID", new OpenApiSecurityScheme
+    {
+        In = ParameterLocation.Header,
+        Description = "Please enter a valid organisation Id",
+        Name = "X-Tenant-Id",
+        Type = SecuritySchemeType.Http,
+    });
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -57,6 +67,14 @@ builder.Services.AddSwaggerGen(c =>
     c.OperationFilter<DocumentationOperationFilter>();
     c.OperationFilter<AuthorizationRolesOperationFilter>(); //The order here matters as it determines how the Summary (and Description) concatinates
 });
+
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+});
+
 #region Auth Stuff
 var tokenValidationParameters = new TokenValidationParameters()
 {
@@ -127,7 +145,7 @@ builder.Services.AddAuthentication(options =>
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
 
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/api/user-hub"))
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/api/notification-hub"))
                 {// If the request is for our hub, grab the token from the query string
                     context.Token = accessToken;
                 }
@@ -208,7 +226,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHub<UserHub>("/api/user-hub"); // The endpoint your Flutter app will connect to
+app.MapHub<NotificationHub>("/api/notification-hub"); // The endpoint your Flutter app will connect to
 
 // Replace: ApplicationDbInitializer.SeedRoles(app).Wait();
 // Replace: ApplicationDbInitializer.SeedAdmin(app).Wait();

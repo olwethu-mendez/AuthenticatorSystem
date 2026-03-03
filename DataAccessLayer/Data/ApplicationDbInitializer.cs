@@ -21,6 +21,8 @@ namespace DataAccessLayer.Data
                 var roleManager = serviceScope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
                 if(!await roleManager.RoleExistsAsync(UserRoles.Admin))
                     await roleManager.CreateAsync(new IdentityRole(UserRoles.Admin));
+                if(!await roleManager.RoleExistsAsync(UserRoles.OrgAdmin))
+                    await roleManager.CreateAsync(new IdentityRole(UserRoles.OrgAdmin));
                 if(!await roleManager.RoleExistsAsync(UserRoles.General))
                     await roleManager.CreateAsync(new IdentityRole(UserRoles.General));
             }

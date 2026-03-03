@@ -1,20 +1,11 @@
-﻿using BusinessLogicLayer.DTOs.Authentication;
-using BusinessLogicLayer.DTOs.Profile;
-using BusinessLogicLayer.DTOs.User;
-using BusinessLogicLayer.Hubs;
+﻿using BusinessLogicLayer.DTOs.User;
 using BusinessLogicLayer.Infrastructure;
 using BusinessLogicLayer.Interfaces;
 using DataAccessLayer.Data;
 using DataAccessLayer.Models;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BusinessLogicLayer.Services
 {
@@ -23,16 +14,16 @@ namespace BusinessLogicLayer.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ContextAccessorService _contextAccessor;
         private readonly ApplicationDbContext _context;
-        private readonly IHubContext<UserHub> _hubContext;
+        private readonly INotificationService _notificationService;
         private readonly IProfileService _profileService;
         private readonly ISmsService _smsService;
         private readonly IEmailService _emailService;
-        public UsersService(UserManager<ApplicationUser> userManager, ContextAccessorService contextAccessor, ApplicationDbContext context, IHubContext<UserHub> hubContext, IProfileService profileService, ISmsService smsService, IEmailService emailService)
+        public UsersService(UserManager<ApplicationUser> userManager, ContextAccessorService contextAccessor, ApplicationDbContext context, INotificationService notificationService, IProfileService profileService, ISmsService smsService, IEmailService emailService)
         {
             _userManager = userManager;
             _contextAccessor = contextAccessor;
             _context = context;
-            _hubContext = hubContext;
+            _notificationService = notificationService;
             _profileService = profileService;
             _smsService = smsService;
             _emailService = emailService;
@@ -125,12 +116,8 @@ namespace BusinessLogicLayer.Services
                 accountUser.IsDeactivatedByAdmin = true;
                 var result = await _userManager.UpdateAsync(accountUser);
                 if (!result.Succeeded) throw new ClientError(500, "Failed to deactivate account.");
-                await _hubContext.Clients.User(accountUserId).SendAsync("ReceiveAccountStatus", new
-                {
-                    userId = accountUserId, // ADD THIS LINE
-                    isDeactivated = accountUser.IsDeactivated,
-                    message = "Your account status has been changed by an admin."
-                });
+                await _notificationService.NotifyUserStatusChange(accountUserId, accountUser.IsDeactivatedByAdmin, "Your account status has been changed by an admin.");
+                await _notificationService.SendGlobalNotification("Account Deactivated By Admin", "Your account status has been changed by an admin.");
                 return "deactivated";
             }
             else
@@ -138,6 +125,7 @@ namespace BusinessLogicLayer.Services
                 accountUser.IsDeactivatedByAdmin = false;
                 var result = await _userManager.UpdateAsync(accountUser);
                 if (!result.Succeeded) throw new ClientError(500, "Failed to activate account.");
+                await _notificationService.SendGlobalNotification("Account Activated By Admin", "Your account status has been changed by an admin.");
                 return "activated";
             }
         }

@@ -1,14 +1,9 @@
-﻿using BusinessLogicLayer.Infrastructure;
-using BusinessLogicLayer.Services;
+﻿using BusinessLogicLayer.Services;
 using DataAccessLayer.Data;
-using DataAccessLayer.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
-using System.Security.Claims;
 
 namespace BusinessLogicLayer.Middleware
 {

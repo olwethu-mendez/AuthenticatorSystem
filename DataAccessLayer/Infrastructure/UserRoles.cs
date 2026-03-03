@@ -9,6 +9,7 @@ namespace BusinessLogicLayer.Infrastructure
     public class UserRoles
     {
         public const string Admin = "Admin";
+        public const string OrgAdmin = "OrganizationAdmin";
         public const string General = "General";
     }
 }

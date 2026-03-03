@@ -12,7 +12,9 @@ namespace BusinessLogicLayer.Services
     public enum FileToUpload
     {
         ProfileImage,
-        RecipeImage,
+        ProfileHeaderImage,
+        OrganizationImage,
+        OrganizationHeaderImage,
         Other
     }
     public class R2Service
@@ -113,15 +115,24 @@ namespace BusinessLogicLayer.Services
             // Replace invalid characters with underscores
             var invalidChars = Path.GetInvalidFileNameChars();
             fileName = string.Concat(fileName.Select(c => invalidChars.Contains(c) ? '_' : c));
+            string? imageFolder;
             if (toUpload == FileToUpload.ProfileImage)
+                imageFolder = "profile_images/";
+            else if (toUpload == FileToUpload.ProfileHeaderImage)
+                imageFolder = "profile_header_image/";
+            else if (toUpload == FileToUpload.OrganizationImage)
+                imageFolder = "organization_images/";
+            else if (toUpload == FileToUpload.OrganizationHeaderImage)
+                imageFolder = "organization_header_image/";
+            else imageFolder = string.Empty;
+
+            if (_context.Profiles.Any(x => x.ProfilePictureName == fileName))
             {
-                if (_context.Profiles.Any(x => x.ProfilePictureName == fileName))
-                {
-                    string uniqueSuffix = $"_{DateTime.UtcNow:yyyyMMddHHmmss}";
-                    fileName = Path.GetFileNameWithoutExtension(fileName) + uniqueSuffix + Path.GetExtension(fileName);
-                }
-                fileName = "profile_images/" + fileName;
+                string uniqueSuffix = $"_{DateTime.UtcNow:yyyyMMddHHmmss}";
+                fileName = Path.GetFileNameWithoutExtension(fileName) + uniqueSuffix + Path.GetExtension(fileName);
             }
+
+            fileName = imageFolder + fileName;
             return fileName;
         }
 

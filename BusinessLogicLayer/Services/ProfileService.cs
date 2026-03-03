@@ -135,6 +135,7 @@ namespace BusinessLogicLayer.Services
             var profile = await _context.Profiles.Include(x => x.User).FirstOrDefaultAsync(x => x.UserId == userId);
             if (profile == null) throw new ClientError(404, "Profile not found.");
             var lastPassword = await _context.PreviousPasswords.Where(x=>x.UserId == userId).OrderByDescending(x=>x.DateSet).FirstOrDefaultAsync();
+            var roles = await _userManager.GetRolesAsync(profile.User!);
             var userProfile = new GetProfileDto
             {
                 UserId = profile?.User?.Id,
@@ -142,6 +143,7 @@ namespace BusinessLogicLayer.Services
                 Username = profile?.User?.UserName,
                 FirstName = profile?.FirstName,
                 LastName = profile?.LastName,
+                Roles = roles.ToList(),
                 EmailAddress = profile?.User?.Email,
                 EmailConfirmed = profile?.User?.EmailConfirmed,
                 CountryCode = !string.IsNullOrEmpty(profile?.User?.CountryCode) ? $"{profile?.User?.CountryCode}" : null,

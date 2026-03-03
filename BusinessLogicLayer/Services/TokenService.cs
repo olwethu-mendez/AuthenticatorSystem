@@ -62,6 +62,17 @@ namespace BusinessLogicLayer.Services
                     new Claim("LastName", userProfile?.LastName ?? string.Empty),
                     new Claim("PhoneNumber", phoneNumber ?? string.Empty),
                 });
+                var userOrgs = await _context.ProfileOrganisations
+                    .Where(po => po.Profile.UserId == user.Id && po.InvitationAccepted == true)
+                    .Select(po => po.OrganisationId)
+                    .ToListAsync();
+                if (userOrgs.Count > 0)
+                {
+                    foreach (var orgId in userOrgs)
+                    {
+                        authClaims.Add(new Claim("MemberOfOrg", orgId));
+                    }
+                }
             }
             else hasProfile = false;
             authClaims.Add(new Claim("HasProfile", hasProfile.ToString().ToLower()));
