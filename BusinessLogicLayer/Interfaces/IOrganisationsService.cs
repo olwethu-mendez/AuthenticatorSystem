@@ -9,8 +9,10 @@ namespace BusinessLogicLayer.Interfaces
     {
         Task<AuthResultDto> CreateOrganisation(CreateOrganisationDto payload);
         Task InviteUserToDomain(string profileId);
-        Task AcceptInvitation(string organisationId, bool invitationAccepted);
+        Task<AuthResultDto> AcceptInvitation(string organisationId, bool invitationAccepted);
         Task<GetOrganisationDto> GetOrganisation(string organisationId);
+        Task<List<GetOrganisationsDto>> GetOrganisations();
+        Task<List<GetOrganisationsDto>> GetPublicOrganisations();
         Task<List<GetMyOrganisationDto>> GetMyOrganisations();
         //Task UpdateProfile(UpdateProfileDto payload);
         //Task UpdateProfilePicture(IFormFile? profilePicture);

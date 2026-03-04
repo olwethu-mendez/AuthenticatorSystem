@@ -1,6 +1,8 @@
 ﻿using BusinessLogicLayer.DTOs.Authentication;
 using BusinessLogicLayer.DTOs.Organisations;
+using BusinessLogicLayer.Infrastructure;
 using BusinessLogicLayer.Interfaces;
+using DataAccessLayer.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,26 +20,50 @@ namespace AuthenticatorSystem.Controllers
             _organisationService = organisationService;
         }
 
-        [HttpPost()]
+        [HttpPost("create")]
+        [Authorize(Policy = UserPolicies.MustHaveProfile)]
+        [Authorize(Policy = UserPolicies.MustBeActivated)]
         public async Task<IActionResult> CreateOrganisation([FromForm] CreateOrganisationDto payload)
         {
-            return Ok();
+            var result = await _organisationService.CreateOrganisation(payload);
+            return Ok(result);
         }
-        public async Task<IActionResult> InviteUserToDomain(string profileId)
+
+        [HttpPost("invitation")]
+        [Authorize(Roles = UserRoles.OrgAdmin)]
+        [Authorize(Policy = UserPolicies.MustHaveProfile)]
+        [Authorize(Policy = UserPolicies.MustBeActivated)]
+        public async Task<IActionResult> InviteUserToDomain([FromQuery] string profileId)
         {
+            await _organisationService.InviteUserToDomain(profileId);
             return Ok();
         }
-        public async Task<IActionResult> AcceptInvitation(string organisationId, bool invitationAccepted)
+
+        [HttpPut("accept-invitation")]
+        [Authorize(Policy = UserPolicies.MustHaveProfile)]
+        [Authorize(Policy = UserPolicies.MustBeActivated)]
+        public async Task<IActionResult> AcceptInvitation([FromQuery] string organisationId, bool invitationAccepted)
         {
-            return Ok();
+            var result = await _organisationService.AcceptInvitation(organisationId, invitationAccepted);
+            return Ok(result);
         }
+
+        [HttpGet("get-organisation/{organisationId}")]
+        [Authorize(Policy = UserPolicies.MustHaveProfile)]
+        [Authorize(Policy = UserPolicies.MustBeActivated)]
         public async Task<IActionResult> GetOrganisation(string organisationId)
         {
-            return Ok();
+            var result = await _organisationService.GetOrganisation(organisationId);
+            return Ok(result);
         }
+
+        [HttpGet("my-organisations")]
+        [Authorize(Policy = UserPolicies.MustHaveProfile)]
+        [Authorize(Policy = UserPolicies.MustBeActivated)]
         public async Task<IActionResult> GetMyOrganisations()
         {
-            return Ok();
+            var result = await _organisationService.GetMyOrganisations();
+            return Ok(result);
         }
     }
 }

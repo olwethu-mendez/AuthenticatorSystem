@@ -229,6 +229,7 @@ namespace BusinessLogicLayer.Services
         public async Task ResendSmsOtpAsync()
         {
             var userId = _contextAccessor.GetCurrentUserId();
+            if (userId == null) throw new ClientError(401, "User not authenticated");
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null) throw new ClientError(404, "User not found");
 
@@ -241,6 +242,7 @@ namespace BusinessLogicLayer.Services
         public async Task ResendEmailOtpAsync()
         {
             var userId = _contextAccessor.GetCurrentUserId();
+            if (userId == null) throw new ClientError(401, "User not authenticated");
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null) throw new ClientError(404, "User not found");
 

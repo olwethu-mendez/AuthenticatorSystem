@@ -13,6 +13,7 @@ namespace DataAccessLayer.Models
         public string? OrganizationImageName { get; set; }
         public string? OrganizationHeaderImageUrl { get; set; }
         public string? OrganizationHeaderImageName { get; set; }
+        public bool IsPublic { get; set; } = false;
         public DateTime RegistrationDate { get; set; } = DateTime.UtcNow;
 
         public virtual ICollection<ProfileOrganisation>? ProfileOrganisations { get; set; }

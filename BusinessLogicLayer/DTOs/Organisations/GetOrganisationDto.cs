@@ -8,6 +8,7 @@ namespace BusinessLogicLayer.DTOs.Organisations
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string Subdomain { get; set; } = string.Empty;
+        public bool? IsPublic { get; set; }
         public string? OrganizationImageUrl { get; set; }
         public string? OrganizationHeaderImageUrl { get; set; }
     }
@@ -17,7 +18,15 @@ namespace BusinessLogicLayer.DTOs.Organisations
         public string Name { get; set; } = string.Empty;
         public string Subdomain { get; set; } = string.Empty;
         public string? OrganizationImageUrl { get; set; }
-        public string? OrganizationHeaderImageUrl { get; set; }
         public bool? IsAdmin { get; set; }
+    }
+    public class GetOrganisationsDto
+    {
+        public string OrganizationId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Subdomain { get; set; } = string.Empty;
+        public string? OrganizationImageUrl { get; set; }
+        public bool? IsPublic { get; set; }
+        public bool? InvitationAccepted { get; set; }
     }
 }

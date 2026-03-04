@@ -54,16 +54,36 @@ builder.Services.AddSwaggerGen(c =>
         In = ParameterLocation.Header,
         Description = "Please enter a valid organisation Id",
         Name = "X-Tenant-Id",
-        Type = SecuritySchemeType.Http,
+        Type = SecuritySchemeType.ApiKey,
     });
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
             new OpenApiSecurityScheme {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-            }, new string[]{}
+                Reference = new OpenApiReference 
+                {
+                    Type = ReferenceType.SecurityScheme, 
+                    Id = "Bearer"
+                }
+
+            },
+            new string[]{}
         }
     });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+{
+    {
+        new OpenApiSecurityScheme
+        {
+            Reference = new OpenApiReference
+            {
+                Type = ReferenceType.SecurityScheme,
+                Id = "Tenant ID"
+            }
+        },
+        Array.Empty<string>()
+    }
+});
     c.OperationFilter<DocumentationOperationFilter>();
     c.OperationFilter<AuthorizationRolesOperationFilter>(); //The order here matters as it determines how the Summary (and Description) concatinates
 });

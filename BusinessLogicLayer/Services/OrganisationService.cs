@@ -37,14 +37,17 @@ namespace BusinessLogicLayer.Services
             _tokenService = tokenService;
         }
 
-        public async Task AcceptInvitation(string organisationId, bool invitationAccepted)
+        public async Task<AuthResultDto> AcceptInvitation(string organisationId, bool invitationAccepted)
         {
             var currentUserId = _contextAccessorService.GetCurrentUserId();
             if (currentUserId == null) throw new ClientError(401, "Failed to retrieve currently authenticated user");
             var profile = await _context.Profiles.FirstOrDefaultAsync(p => p.UserId == currentUserId);
             if (profile == null) throw new ClientError(404, "Current User Profile not found");
 
-            var profileOrganisation = await _context.ProfileOrganisations.FirstOrDefaultAsync(x => x.OrganisationId == organisationId && x.ProfileId == profile.Id && x.InvitationAccepted == null);
+            var profileOrganisation = await _context.ProfileOrganisations.FirstOrDefaultAsync(
+                x => x.OrganisationId == organisationId && 
+                x.ProfileId == profile.Id && 
+                x.InvitationAccepted == null);
             if (profileOrganisation == null)
             {
                 string status = invitationAccepted ? "accept" : "reject";
@@ -53,6 +56,15 @@ namespace BusinessLogicLayer.Services
 
             profileOrganisation.InvitationAccepted = invitationAccepted;
             await _context.SaveChangesAsync();
+
+            using (var scope = _scopeFactory.CreateScope())
+            {
+                var authService = scope.ServiceProvider.GetRequiredService<IAuthenticationService>();
+                await authService.LogoutAsync();
+            }
+
+            var newToken = await _tokenService.GenerateJwtToken(profile.User, false, null);
+            return newToken;
         }
 
         public async Task<AuthResultDto> CreateOrganisation(CreateOrganisationDto payload)
@@ -66,6 +78,7 @@ namespace BusinessLogicLayer.Services
             {
                 Name = payload.Name,
                 Description = payload.Description,
+                IsPublic = payload.IsPublic ?? false,
                 Subdomain = payload.Subdomain,
             };
             if (payload.OrganizationImage != null)
@@ -113,20 +126,28 @@ namespace BusinessLogicLayer.Services
 
         public async Task<GetOrganisationDto> GetOrganisation(string organizationId)
         {
+            var currentUserId = _contextAccessorService.GetCurrentUserId();
+            var profile = await _context.Profiles.FirstOrDefaultAsync(x => x.UserId == currentUserId);
+            if (profile == null) throw new ClientError(404, "Current user profile not found");
             var organisation = await _context.Organisations.FirstOrDefaultAsync(x => x.Id == organizationId);
             if (organisation == null)
                 throw new ClientError(404, "Organisation not found");
-            var organisationDto = new GetOrganisationDto
+            var profileOrganisation = await _context.ProfileOrganisations.Where(x => x.OrganisationId == organizationId && x.ProfileId == profile.Id).ToListAsync();
+            if (organisation.IsPublic == true || profileOrganisation.Select(x => x.OrganisationId).Contains(organizationId))
             {
-                OrganizationId = organizationId,
-                Name = organisation.Name,
-                Description = organisation.Description,
-                OrganizationHeaderImageUrl = organisation.OrganizationHeaderImageUrl,
-                OrganizationImageUrl = organisation.OrganizationImageUrl,
-                Subdomain = organisation.Subdomain,
-            };
-            return organisationDto;
-
+                var organisationDto = new GetOrganisationDto
+                {
+                    OrganizationId = organizationId,
+                    Name = organisation.Name,
+                    Description = organisation.Description,
+                    IsPublic = organisation.IsPublic,
+                    OrganizationHeaderImageUrl = organisation.OrganizationHeaderImageUrl,
+                    OrganizationImageUrl = organisation.OrganizationImageUrl,
+                    Subdomain = organisation.Subdomain,
+                };
+                return organisationDto;
+            }
+            throw new ClientError(403, "You are not authorized to see this organisation");
         }
 
         public async Task InviteUserToDomain(string profileId)
@@ -158,7 +179,9 @@ namespace BusinessLogicLayer.Services
             string result;
             using (var stream = formFile.OpenReadStream())
             {
-                profilePictureName = _r2Service.SanitizeFileName(formFile.FileName, imageType == ImageTypes.Avatar ? FileToUpload.OrganizationImage : FileToUpload.OrganizationHeaderImage);
+                profilePictureName = _r2Service.SanitizeFileName(
+                    formFile.FileName, 
+                    imageType == ImageTypes.Avatar ? FileToUpload.OrganizationImage : FileToUpload.OrganizationHeaderImage);
                 result = await _r2Service.UploadFileAsync(stream, profilePictureName);
             }
             return new Dictionary<string, string>
@@ -173,25 +196,71 @@ namespace BusinessLogicLayer.Services
             await ValidateTenantAccess(requireAdmin: true);
 
             var currentUserId = _contextAccessorService.GetCurrentUserId();
-            if (currentUserId == null)
-                throw new ClientError(401, "Failed to retrieve currently authenticated user");
+            if (currentUserId == null) throw new ClientError(401, "Failed to retrieve currently authenticated user");
 
-            var profile = await _context.Profiles
-                .FirstOrDefaultAsync(p => p.UserId == currentUserId);
+            var profile = await _context.Profiles.FirstOrDefaultAsync(p => p.UserId == currentUserId);
 
-            if (profile == null)
-                throw new ClientError(404, "Current User Profile not found");
+            if (profile == null) throw new ClientError(404, "Current User Profile not found");
 
             var organisations = await _context.ProfileOrganisations
-                .Where(po => po.ProfileId == profile.Id && po.InvitationAccepted == true)
+                .Where(po => po.ProfileId == profile.Id && po.IsOrgAdmin == true)
                 .Select(po => new GetMyOrganisationDto
                 {
                     OrganizationId = po.Organisation.Id,
                     Name = po.Organisation.Name,
                     Subdomain = po.Organisation.Subdomain,
                     OrganizationImageUrl = po.Organisation.OrganizationImageUrl,
-                    OrganizationHeaderImageUrl = po.Organisation.OrganizationHeaderImageUrl,
                     IsAdmin = po.IsOrgAdmin
+                })
+                .ToListAsync();
+
+            return organisations;
+        }
+
+        public async Task<List<GetOrganisationsDto>> GetOrganisations()
+        {
+            var currentUserId = _contextAccessorService.GetCurrentUserId();
+            if (currentUserId == null)
+                throw new ClientError(401, "Failed to retrieve currently authenticated user");
+
+            var profile = await _context.Profiles.FirstOrDefaultAsync(p => p.UserId == currentUserId);
+
+            if (profile == null) throw new ClientError(404, "Current User Profile not found");
+
+            var organisations = await _context.ProfileOrganisations
+                .Where(po => po.ProfileId == profile.Id && po.InvitationAccepted == true)
+                .Select(po => new GetOrganisationsDto
+                {
+                    OrganizationId = po.Organisation.Id,
+                    Name = po.Organisation.Name,
+                    Subdomain = po.Organisation.Subdomain,
+                    OrganizationImageUrl = po.Organisation.OrganizationImageUrl,
+                    IsPublic = po.Organisation.IsPublic
+                })
+                .ToListAsync();
+
+            return organisations;
+        }
+
+        public async Task<List<GetOrganisationsDto>> GetPublicOrganisations()
+        {
+            var currentUserId = _contextAccessorService.GetCurrentUserId();
+            if (currentUserId == null)
+                throw new ClientError(401, "Failed to retrieve currently authenticated user");
+
+            var profile = await _context.Profiles.FirstOrDefaultAsync(p => p.UserId == currentUserId);
+
+            if (profile == null) throw new ClientError(404, "Current User Profile not found");
+
+            var organisations = await _context.ProfileOrganisations
+                .Where(po => po.ProfileId == profile.Id && po.Organisation!.IsPublic == true)
+                .Select(po => new GetOrganisationsDto
+                {
+                    OrganizationId = po.Organisation.Id,
+                    Name = po.Organisation.Name,
+                    Subdomain = po.Organisation.Subdomain,
+                    OrganizationImageUrl = po.Organisation.OrganizationImageUrl,
+                    IsPublic = po.Organisation.IsPublic
                 })
                 .ToListAsync();
 
