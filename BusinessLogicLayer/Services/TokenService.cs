@@ -31,7 +31,7 @@ namespace BusinessLogicLayer.Services
             _context = context;
             _serviceProvider = serviceProvider;
         }
-        public async Task<AuthResultDto> GenerateJwtToken(ApplicationUser user, bool stayLoggedIn, RefreshToken? existingRefreshToken)
+        public async Task<AuthResultDto> GenerateJwtToken(ApplicationUser user, bool stayLoggedIn, RefreshToken? existingRefreshToken, string? activeOrganisationId)
         {
             var authClaims = new List<Claim>()
             {
@@ -71,6 +71,12 @@ namespace BusinessLogicLayer.Services
                     foreach (var orgId in userOrgs)
                     {
                         authClaims.Add(new Claim("MemberOfOrg", orgId));
+                    }
+
+                    // Default active org = first one
+                    if (activeOrganisationId != null)
+                    {
+                        authClaims.Add(new Claim("ActiveOrgId", activeOrganisationId));
                     }
                 }
             }
