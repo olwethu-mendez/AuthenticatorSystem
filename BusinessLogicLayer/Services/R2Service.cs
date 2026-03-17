@@ -115,19 +115,36 @@ namespace BusinessLogicLayer.Services
             // Replace invalid characters with underscores
             var invalidChars = Path.GetInvalidFileNameChars();
             fileName = string.Concat(fileName.Select(c => invalidChars.Contains(c) ? '_' : c));
+            bool isFound;
             string? imageFolder;
             if (toUpload == FileToUpload.ProfileImage)
+            {
                 imageFolder = "profile_images/";
+                isFound = _context.Profiles.Any(x => x.ProfilePictureName == fileName);
+            }
             else if (toUpload == FileToUpload.ProfileHeaderImage)
+            {
                 imageFolder = "profile_header_image/";
+                isFound = _context.Profiles.Any(x => x.ProfileHeaderName == fileName);
+            }
             else if (toUpload == FileToUpload.OrganizationImage)
+            {
                 imageFolder = "organization_images/";
+                isFound = _context.Organisations.Any(x => x.OrganizationImageName == fileName);
+            }
             else if (toUpload == FileToUpload.OrganizationHeaderImage)
+            {
                 imageFolder = "organization_header_image/";
-            else imageFolder = string.Empty;
+
+                isFound = _context.Organisations.Any(x => x.OrganizationHeaderImageName == fileName);
+            }
+            else { 
+                imageFolder = string.Empty;
+                isFound = false;
+            }
 
             //make this dynamic somehow
-            if (_context.Profiles.Any(x => x.ProfilePictureName == fileName))
+            if (isFound)
             {
                 string uniqueSuffix = $"_{DateTime.UtcNow:yyyyMMddHHmmss}";
                 fileName = Path.GetFileNameWithoutExtension(fileName) + uniqueSuffix + Path.GetExtension(fileName);

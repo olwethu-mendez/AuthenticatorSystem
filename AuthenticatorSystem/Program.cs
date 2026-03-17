@@ -22,6 +22,8 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IUsersService, UsersService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IOrganisationService, OrganisationService>();
+builder.Services.AddScoped<IProfileOrganisationServices, ProfileOrganisationServices>();
+builder.Services.AddScoped<IProjectServices, ProjectService>();
 builder.Services.AddScoped<ContextAccessorService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<R2Service>();

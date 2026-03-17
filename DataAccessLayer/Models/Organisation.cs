@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using DataAccessLayer.Infrastructure;
+using System.ComponentModel.DataAnnotations;
 
 namespace DataAccessLayer.Models
 {
@@ -15,8 +16,9 @@ namespace DataAccessLayer.Models
         public string? OrganizationHeaderImageName { get; set; }
         public bool IsPublic { get; set; } = false;
         public DateTime RegistrationDate { get; set; } = DateTime.UtcNow;
+        public string? Status { get; set; } = StatusValue.Activated;
 
         public virtual ICollection<ProfileOrganisation>? ProfileOrganisations { get; set; }
-
+        public virtual ICollection<OrganisationProject>? OrganisationProjects { get; set; }
     }
 }

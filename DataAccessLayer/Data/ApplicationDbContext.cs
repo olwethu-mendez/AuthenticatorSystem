@@ -19,19 +19,37 @@ namespace DataAccessLayer.Data
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<TokenBlacklist> TokenBlacklists { get; set; }
         public DbSet<ProfileOrganisation> ProfileOrganisations { get; set; }
+        public DbSet<OrganisationProject> OrganisationProjects { get; set; }
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
             builder.Entity<ProfileOrganisation>()
                 .HasKey(po => new { po.ProfileId, po.OrganisationId });
+            builder.Entity<ProfileProject>()
+                .HasKey(pp => new { pp.ProfileId, pp.ProjectId });
 
             // Apply Global Filter to any entity implementing ITenantEntity
             // This automatically adds "WHERE OrganisationId = 'xxx'" to all queries
-            builder.Entity<ProfileOrganisation>()
-                .HasQueryFilter(po => po.OrganisationId == _tenantService.TenantId);
+            /*builder.Entity<ProfileOrganisation>()
+                .HasQueryFilter(po => po.OrganisationId == _tenantService.TenantId);*/
+
+            //foreach (var entityType in builder.Model.GetEntityTypes())
+            //{
+            //    if (typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType))
+            //    {
+            //        builder.Entity(entityType.ClrType)
+            //            .HasQueryFilter(
+            //                EF.Property<Guid>(EF.Property<object>(null, "e"), "OrganisationId") == _tenantService.TenantId
+            //            );
+            //    }
+            //}
+
+            builder.Entity<OrganisationProject>().HasQueryFilter(p => p.OrganisationId == _tenantService.TenantId);
+            builder.Entity<ProfileProject>().HasQueryFilter(p => p.OrganisationId == _tenantService.TenantId);
 
             // If you create other tables like 'Project' or 'Invoice', do the same:
             // builder.Entity<Project>().HasQueryFilter(p => p.OrganisationId == _tenantService.TenantId);
+            builder.Entity<ProfileOrganisation>().HasQueryFilter(po => po.OrganisationId == _tenantService.TenantId);
         }
     }
 }

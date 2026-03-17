@@ -74,5 +74,12 @@ namespace AuthenticatorSystem.Controllers
             var result = await _organisationService.GetPublicOrganisations();
             return Ok(result);
         }
+
+        [HttpPost("switch-organisation/{organisationId}")]
+        public async Task<IActionResult> SwitchOrganisation(string organisationId)
+        {
+            var token = await _organisationService.SwitchOrganisation(organisationId);
+            return Ok(token);
+        }
     }
 }

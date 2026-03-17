@@ -27,6 +27,7 @@ namespace BusinessLogicLayer.Services
         private readonly R2Service _r2Service;
         private readonly ISmsService _smsService;
         private readonly IEmailService _emailService;
+        private readonly ITenantService _tenantService;
 
         public ProfileService(
             TokenService tokenService,
@@ -39,7 +40,8 @@ namespace BusinessLogicLayer.Services
             ContextAccessorService contextAccessor,
             R2Service r2Service,
             ISmsService smsService,
-            IEmailService emailService)
+            IEmailService emailService,
+            ITenantService tenantService)
         {
             _tokenService = tokenService;
             _userManager = userManager;
@@ -52,6 +54,7 @@ namespace BusinessLogicLayer.Services
             _r2Service = r2Service;
             _smsService = smsService;
             _emailService = emailService;
+            _tenantService = tenantService;
         }
 
         public async Task<AuthResultDto> CreateProfile(CreateProfileDto payload)
@@ -88,7 +91,7 @@ namespace BusinessLogicLayer.Services
 
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null) throw new ClientError(401, "User not found.");
-            var newToken = await _tokenService.GenerateJwtToken(user, payload.StayLoggedIn, null);
+            var newToken = await _tokenService.GenerateJwtToken(user, payload.StayLoggedIn, null, null);
             return newToken;
         }
 
@@ -117,6 +120,8 @@ namespace BusinessLogicLayer.Services
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null) throw new ClientError(404, "User not found.");
 
+            var organisationId = _tenantService.TenantId;
+
             if(!user.IsDeactivated) throw new ClientError(400, "Profile already activated");
             var isPasswordValid = await _userManager.CheckPasswordAsync(user, payload.Password);
             if (!isPasswordValid) throw new ClientError(400, "Invalid password. Cannot activate account.");
@@ -125,7 +130,7 @@ namespace BusinessLogicLayer.Services
             var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded) throw new ClientError(500, "Failed to update lockout status.");
 
-            return await _tokenService.GenerateJwtToken(user, false, null);
+            return await _tokenService.GenerateJwtToken(user, false, null, organisationId);
         }
 
         public async Task<GetProfileDto> GetProfile()

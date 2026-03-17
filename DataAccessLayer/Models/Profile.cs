@@ -28,5 +28,6 @@ namespace DataAccessLayer.Models
 
         public virtual ApplicationUser? User { get; set; }
         public virtual ICollection<ProfileOrganisation>? ProfileOrganisations { get; set; }
+        public virtual ICollection<OrganisationProject>? OrganisationProjects { get; set; }
     }
 }

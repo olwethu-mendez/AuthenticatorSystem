@@ -1,6 +1,9 @@
-﻿using Amazon;
-using BusinessLogicLayer.DTOs.Authentication;
+﻿using BusinessLogicLayer.DTOs.Authentication;
 using BusinessLogicLayer.DTOs.Organisations;
+using BusinessLogicLayer.DTOs.Profile;
+using BusinessLogicLayer.DTOs.ProfileOrganisation;
+using BusinessLogicLayer.DTOs.User;
+using BusinessLogicLayer.DTOs.OrganisationProjects;
 using BusinessLogicLayer.Helper;
 using BusinessLogicLayer.Infrastructure;
 using BusinessLogicLayer.Interfaces;
@@ -9,16 +12,8 @@ using DataAccessLayer.Infrastructure;
 using DataAccessLayer.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Claims;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace BusinessLogicLayer.Services
 {
@@ -30,8 +25,9 @@ namespace BusinessLogicLayer.Services
         private readonly ApplicationDbContext _context;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly TokenService _tokenService;
+        private readonly ITenantService _tenantService;
 
-        public OrganisationService(ContextAccessorService contextAccessorService, UserManager<ApplicationUser> userManager, R2Service r2Service, ApplicationDbContext context, IServiceScopeFactory serviceScope, TokenService tokenService)
+        public OrganisationService(ContextAccessorService contextAccessorService, UserManager<ApplicationUser> userManager, R2Service r2Service, ApplicationDbContext context, IServiceScopeFactory serviceScope, TokenService tokenService, ITenantService tenantService)
         {
             _contextAccessorService = contextAccessorService;
             _userManager = userManager;
@@ -39,14 +35,16 @@ namespace BusinessLogicLayer.Services
             _context = context;
             _scopeFactory = serviceScope;
             _tokenService = tokenService;
+            _tenantService = tenantService;
         }
 
         public async Task<AuthResultDto> AcceptInvitation(string organisationId, bool invitationAccepted)
         {
             var currentUserId = _contextAccessorService.GetCurrentUserId();
             if (currentUserId == null) throw new ClientError(401, "Failed to retrieve currently authenticated user");
-            var profile = await _context.Profiles.FirstOrDefaultAsync(p => p.UserId == currentUserId);
+            var profile = await _context.Profiles.Include(x=>x.User).FirstOrDefaultAsync(p => p.UserId == currentUserId);
             if (profile == null) throw new ClientError(404, "Current User Profile not found");
+            if (profile.User == null) throw new ClientError(404, "Current User not found");
 
             var profileOrganisation = await _context.ProfileOrganisations.FirstOrDefaultAsync(
                 x => x.OrganisationId == organisationId && 
@@ -67,7 +65,7 @@ namespace BusinessLogicLayer.Services
                 await authService.LogoutAsync();
             }
 
-            var newToken = await _tokenService.GenerateJwtToken(profile.User, false, null);
+            var newToken = await _tokenService.GenerateJwtToken(profile.User, false, null, organisationId);
             return newToken;
         }
 
@@ -84,6 +82,7 @@ namespace BusinessLogicLayer.Services
                 Description = payload.Description,
                 IsPublic = payload.IsPublic ?? false,
                 Subdomain = payload.Subdomain ?? MultiTenantHelper.ToSubdomain(payload.Name),
+                Status = StatusValue.Activated,                
             };
             if (payload.OrganizationImage != null)
             {
@@ -110,7 +109,7 @@ namespace BusinessLogicLayer.Services
                 await authService.LogoutAsync();
             }
 
-            var newToken = await _tokenService.GenerateJwtToken(currentUser, false, null);
+            var newToken = await _tokenService.GenerateJwtToken(currentUser, false, null, organisation.Id);
             return newToken;
 
         }
@@ -137,8 +136,12 @@ namespace BusinessLogicLayer.Services
             var organisation = await _context.Organisations.FirstOrDefaultAsync(x => x.Id == organizationId);
             if (organisation == null)
                 throw new ClientError(404, "Organisation not found");
-            var profileOrganisation = await _context.ProfileOrganisations.Where(x => x.OrganisationId == organizationId && x.ProfileId == profile.Id).ToListAsync();
-            if (organisation.IsPublic == true || profileOrganisation.Select(x => x.OrganisationId).Contains(organizationId))
+            var profileOrganisation = await _context.ProfileOrganisations
+                .Include(x => x.Organisation).ThenInclude(x=>x.OrganisationProjects).Include(x => x.Profile).ThenInclude(x=>x.User)
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.OrganisationId == organizationId && x.ProfileId == profile.Id);
+            if(profileOrganisation == null) throw new ClientError(403, "You are not authorized to see this organisation");
+            if ((organisation.Status == StatusValue.Activated && profileOrganisation.OrganisationId ==organizationId) || organisation.IsPublic)
             {
                 var organisationDto = new GetOrganisationDto
                 {
@@ -146,13 +149,27 @@ namespace BusinessLogicLayer.Services
                     Name = organisation.Name,
                     Description = organisation.Description,
                     IsPublic = organisation.IsPublic,
+                    Projects = organisation.OrganisationProjects?.Select(p => new GetProjectsDto
+                    {
+                        ProjectId = p.Id,
+                        Name = p.Name,
+                        ProjectImageUrl = p.ProjectImageUrl
+                    }).ToList() ?? new List<GetProjectsDto>(),
                     OrganizationHeaderImageUrl = organisation.OrganizationHeaderImageUrl,
                     OrganizationImageUrl = organisation.OrganizationImageUrl,
                     Subdomain = organisation.Subdomain,
+                    Status = organisation.Status,
                 };
                 return organisationDto;
             }
             throw new ClientError(403, "You are not authorized to see this organisation");
+        }
+
+        public async Task<GetOrganisationDto> GetCurrentOrganisation()
+        {
+            var organisationId = _tenantService.TenantId;
+            if (organisationId == null) throw new ClientError(400, "Organisation not found or invalid");
+            return await GetOrganisation(organisationId);
         }
 
         public async Task<List<GetOrganisationsDto>> GetOrganisations()
@@ -166,15 +183,17 @@ namespace BusinessLogicLayer.Services
             if (profile == null) throw new ClientError(404, "Current User Profile not found");
 
             var organisations = await _context.ProfileOrganisations
-                .Where(po => po.ProfileId == profile.Id && po.InvitationAccepted == true)
+                .Where(po => po.ProfileId == profile.Id && po.InvitationAccepted == true && po.Organisation!.Status == StatusValue.Activated)
                 .Include(x=>x.Organisation).Include(x=>x.Profile)
+                .IgnoreQueryFilters()
                 .Select(po => new GetOrganisationsDto
                 {
                     OrganizationId = po.Organisation.Id,
                     Name = po.Organisation.Name,
                     Subdomain = po.Organisation.Subdomain,
                     OrganizationImageUrl = po.Organisation.OrganizationImageUrl,
-                    IsPublic = po.Organisation.IsPublic
+                    IsPublic = po.Organisation.IsPublic,
+                    Status = po.Organisation.Status,
                 })
                 .ToListAsync();
 
@@ -193,13 +212,16 @@ namespace BusinessLogicLayer.Services
             var organisations = await _context.ProfileOrganisations
                 .Where(po => po.ProfileId == profile.Id && po.IsOrgAdmin == true)
                 .Include(x => x.Organisation).Include(x => x.Profile)
+                .IgnoreQueryFilters()
                 .Select(po => new GetMyOrganisationDto
                 {
                     OrganizationId = po.Organisation.Id,
                     Name = po.Organisation.Name,
                     Subdomain = po.Organisation.Subdomain,
                     OrganizationImageUrl = po.Organisation.OrganizationImageUrl,
-                    IsAdmin = po.IsOrgAdmin
+                    IsPublic = po.Organisation.IsPublic,
+                    IsAdmin = po.IsOrgAdmin,
+                    Status = po.Organisation.Status,
                 })
                 .ToListAsync();
 
@@ -217,7 +239,7 @@ namespace BusinessLogicLayer.Services
             if (profile == null) throw new ClientError(404, "Current User Profile not found");
 
             var organisations = await _context.ProfileOrganisations
-                .Where(po => po.ProfileId == profile.Id && po.Organisation!.IsPublic == true)
+                .Where(po => po.ProfileId == profile.Id && po.Organisation!.IsPublic == true && po.Organisation!.Status == StatusValue.Activated)
                 .IgnoreQueryFilters()
                 .Select(po => new GetOrganisationsDto
                 {
@@ -225,18 +247,67 @@ namespace BusinessLogicLayer.Services
                     Name = po.Organisation.Name,
                     Subdomain = po.Organisation.Subdomain,
                     OrganizationImageUrl = po.Organisation.OrganizationImageUrl,
-                    IsPublic = po.Organisation.IsPublic
+                    IsPublic = po.Organisation.IsPublic,
+                    Status = po.Organisation.Status
                 })
                 .ToListAsync();
 
             return organisations;
         }
 
+        public async Task<List<GetProfileOrganisationDto>> GetOrganisationMembers(string organisationId)
+        {
+            // 1. Validate the user has access to this org first
+            await ValidateTenantAccess();
+
+            // 2. Fetch all ProfileOrganisation records for this Org
+            var members = await _context.ProfileOrganisations
+                .Include(po => po.Profile)
+                .ThenInclude(p => p.User) // Get the identity data too
+                .Include(po => po.Organisation)
+                .ThenInclude(o => o.OrganisationProjects)
+                .Where(po => po.OrganisationId == organisationId && po.InvitationAccepted == true)
+                .ToListAsync();
+
+            // 3. Map to DTO
+            return members.Select(m => new GetProfileOrganisationDto
+            {
+                Profile = new GetUsersListDto
+                {
+                    UserId = m.Profile.UserId,
+                    ProfileId = m.Profile.Id,
+                    FirstName = m.Profile.FirstName,
+                    LastName = m.Profile.LastName,
+                    Username = m.Profile.User.UserName,
+                    ProfilePictureUrl = m.Profile.ProfilePictureUrl
+                },
+                Organisation = new GetOrganisationDto
+                {
+                    OrganizationId = m.OrganisationId,
+                    Name = m.Organisation.Name,
+                    Description = m.Organisation.Description,
+                    IsPublic = m.Organisation.IsPublic,
+                    OrganizationHeaderImageUrl = m.Organisation.OrganizationHeaderImageUrl,
+                    OrganizationImageUrl = m.Organisation.OrganizationImageUrl,
+                    Status = m.Organisation.Status,
+                    Subdomain = m.Organisation.Subdomain,
+                    Projects = m.Organisation.OrganisationProjects?.Select(p=> new GetProjectsDto
+                    {
+                        ProjectId = p.Id,
+                        Name= p.Name,
+                        ProjectImageUrl = p.ProjectImageUrl
+                    }).ToList() ?? new List<GetProjectsDto>()
+                },
+                IsOrgAdmin = m.IsOrgAdmin ?? false,
+                InvitationAccepted = m.InvitationAccepted
+            }).ToList();
+        }
+
         public async Task InviteUserToDomain(string profileId)
         {
             await ValidateTenantAccess(requireAdmin: true);
 
-            var tenantId = _contextAccessorService.GetRequestHeaders("X-Tenant-Id");
+            var tenantId = _tenantService.TenantId;
 
             var profile = await _context.Profiles
                 .FirstOrDefaultAsync(p => p.Id == profileId);
@@ -249,7 +320,7 @@ namespace BusinessLogicLayer.Services
                 ProfileId = profileId,
                 OrganisationId = tenantId!,
                 InvitationAccepted = null,
-                IsOrgAdmin = false
+                IsOrgAdmin = false,
             });
 
             await _context.SaveChangesAsync();
@@ -265,17 +336,55 @@ namespace BusinessLogicLayer.Services
             var currentUser = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == userId);
 
             var isMember = await _context.ProfileOrganisations
+                .Include(x=>x.Profile).Include(x=>x.Organisation)
                 .AnyAsync(po =>
                     po.Profile.UserId == userId &&
                     po.OrganisationId == organisationId &&
-                    po.InvitationAccepted == true);
+                    po.InvitationAccepted == true &&
+                    po.Organisation.Status == StatusValue.Activated);
 
             if (!isMember)
-                throw new ClientError(403, "You are not a member of this organisation.");
+                throw new ClientError(403, "You are not a member of this organisation or is no longer available.");
 
             var newToken = await _tokenService.GenerateJwtToken(currentUser, false,null, organisationId);
 
             return newToken;
+        }
+
+        public async Task<OrganisationStatus> ChangeOrganisationStatus(string organisationId)
+        {
+            var userId = _contextAccessorService.GetCurrentUserId();
+            if (userId == null) throw new ClientError(401, "User not authenticated");
+            var currentUserProfile = await _context.Profiles.Include(x=>x.User).FirstOrDefaultAsync(x => x.UserId == userId);
+            if (currentUserProfile == null) throw new ClientError(404, "User profile not found for logged in user");
+
+            var organisation = await _context.ProfileOrganisations
+                .Include(x => x.Organisation).Include(x => x.Profile)
+                .Where(po => po.ProfileId == currentUserProfile.Id && po.IsOrgAdmin == true && po.OrganisationId == organisationId && po.Organisation.Status == StatusValue.Activated)
+                .Select(po => po.Organisation).FirstOrDefaultAsync();
+            if (organisation == null) throw new ClientError(400, "organisation either not found or you are not allowed to make allowed to manage it.");
+
+            if (organisation.Status == StatusValue.Activated) organisation.Status = StatusValue.Deactivated;
+            else if (organisation.Status == StatusValue.Deactivated) organisation.Status = StatusValue.Activated;
+            else throw new ClientError(403, $"Your current status is {organisation.Status}. You are not allowed to change this.");
+
+            await _context.SaveChangesAsync();
+            return new OrganisationStatus { Status = organisation.Status };
+        }
+
+        public Task UpdateOrganisation(UpdateProfileDto payload)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task UpdateOrganisationLogo(IFormFile? picture)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task UpdateOrganisationHeader(IFormFile? picture)
+        {
+            throw new NotImplementedException();
         }
 
         private async Task<Dictionary<string, string>> InitialImageUpload(IFormFile formFile, string imageType)
@@ -285,7 +394,7 @@ namespace BusinessLogicLayer.Services
             using (var stream = formFile.OpenReadStream())
             {
                 profilePictureName = _r2Service.SanitizeFileName(
-                    formFile.FileName, 
+                    formFile.FileName,
                     imageType == ImageTypes.Avatar ? FileToUpload.OrganizationImage : FileToUpload.OrganizationHeaderImage);
                 result = await _r2Service.UploadFileAsync(stream, profilePictureName);
             }
@@ -298,7 +407,7 @@ namespace BusinessLogicLayer.Services
 
         private async Task<ProfileOrganisation> ValidateTenantAccess(bool requireAdmin = false)
         {
-            var tenantId = _contextAccessorService.GetRequestHeaders("X-Tenant-Id");
+            var tenantId = _tenantService.TenantId;
             if (string.IsNullOrEmpty(tenantId))
                 throw new ClientError(400, "Tenant header required.");
 

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using BusinessLogicLayer.DTOs.OrganisationProjects;
+using System.ComponentModel.DataAnnotations;
 
 namespace BusinessLogicLayer.DTOs.Organisations
 {
@@ -11,6 +12,8 @@ namespace BusinessLogicLayer.DTOs.Organisations
         public bool? IsPublic { get; set; }
         public string? OrganizationImageUrl { get; set; }
         public string? OrganizationHeaderImageUrl { get; set; }
+        public List<GetProjectsDto>? Projects { get; set; }
+        public string? Status { get; set; }
     }
     public class GetMyOrganisationDto
     {
@@ -18,7 +21,9 @@ namespace BusinessLogicLayer.DTOs.Organisations
         public string Name { get; set; } = string.Empty;
         public string Subdomain { get; set; } = string.Empty;
         public string? OrganizationImageUrl { get; set; }
+        public bool? IsPublic { get; set; }
         public bool? IsAdmin { get; set; }
+        public string? Status { get; set; }
     }
     public class GetOrganisationsDto
     {
@@ -27,6 +32,6 @@ namespace BusinessLogicLayer.DTOs.Organisations
         public string Subdomain { get; set; } = string.Empty;
         public string? OrganizationImageUrl { get; set; }
         public bool? IsPublic { get; set; }
-        public bool? InvitationAccepted { get; set; }
+        public string? Status { get; set; }
     }
 }

@@ -32,6 +32,7 @@ namespace BusinessLogicLayer.Services
         private readonly ContextAccessorService _contextAccessor;
         private readonly ISmsService _smsService;
         private readonly IEmailService _emailService;
+        private readonly ITenantService _tenantService;
 
         public AuthenticationService(
             UserManager<ApplicationUser> userManager,
@@ -41,7 +42,8 @@ namespace BusinessLogicLayer.Services
             TokenService tokenService,
             ContextAccessorService contextAccessor,
             ISmsService smsService,
-            IEmailService emailService)
+            IEmailService emailService,
+            ITenantService tenantService)
         {
             _userManager = userManager;
             _context = context;
@@ -51,6 +53,7 @@ namespace BusinessLogicLayer.Services
             _contextAccessor = contextAccessor;
             _smsService = smsService;
             _emailService = emailService;
+            _tenantService = tenantService;
         }
 
         public CheckApiDto CheckApi()
@@ -80,6 +83,8 @@ namespace BusinessLogicLayer.Services
             string phoneNumberRegex = @"^\d{9}$";
             string countryCodeRegex = @"^\+\d{1,3}$";
             string emailRegex = @"^[^@\s]+@[^@\s]+\.[^@\s]+$";
+
+            string? organisationId = _tenantService.TenantId;
 
             ApplicationUser? user = null;
 
@@ -120,7 +125,7 @@ namespace BusinessLogicLayer.Services
             {
                 throw new ClientError(403, "User account is locked.");
             }
-            var tokenResponse = await _tokenService.GenerateJwtToken(user, loginDto.StayLoggedIn ?? false, null);
+            var tokenResponse = await _tokenService.GenerateJwtToken(user, loginDto.StayLoggedIn ?? false, null, organisationId);
             return tokenResponse;
         }
 
@@ -184,6 +189,8 @@ namespace BusinessLogicLayer.Services
 
         public async Task<AuthResultDto> ConfirmEmailWithCodeAsync(NewUserCodeDto newUserCode)
         {
+
+            string? organisationId = _tenantService.TenantId;
             var loggedInUser = _contextAccessor.GetCurrentUserId();
             if (loggedInUser != newUserCode.userId) throw new ClientError(403, "Confirming email failed. Authenticated user does not match user being verified");
             var user = await _userManager.FindByIdAsync(newUserCode.userId);
@@ -205,12 +212,14 @@ namespace BusinessLogicLayer.Services
             await _userManager.UpdateAsync(user);
 
             await LogoutAsync();
-            var newToken = await _tokenService.GenerateJwtToken(user, false, null);
+            var newToken = await _tokenService.GenerateJwtToken(user, false, null, organisationId);
             return newToken;
         }
 
         public async Task<AuthResultDto> ConfirmPhoneNumber(NewUserCodeDto newUserCode)
         {
+
+            string? organisationId = _tenantService.TenantId;
             var loggedInUser = _contextAccessor.GetCurrentUserId();
             if (loggedInUser != newUserCode.userId) throw new ClientError(403, "Confirming email failed. Authenticated user does not match user being verified");
             var user = await _userManager.FindByIdAsync(newUserCode.userId);
@@ -222,7 +231,7 @@ namespace BusinessLogicLayer.Services
             if (!result.Succeeded) throw new ClientError(400, "Invalid or expired verification code");
 
             await LogoutAsync();
-            var newToken = await _tokenService.GenerateJwtToken(user, false, null);
+            var newToken = await _tokenService.GenerateJwtToken(user, false, null, organisationId);
             return newToken;
         }
 
@@ -270,9 +279,10 @@ namespace BusinessLogicLayer.Services
 
         public async Task<AuthResultDto> RefreshTokenAsync(TokenRequestDto tokenRequestDto)
         {
+            string? organisationId = _tenantService.TenantId;
             try
             {
-                var results = await GetPrincipalFromExpiredToken(tokenRequestDto);
+                var results = await GetPrincipalFromExpiredToken(tokenRequestDto, organisationId);
                 if (results == null)
                 {
                     throw new ClientError(400, "Invalid token.");
@@ -371,13 +381,13 @@ namespace BusinessLogicLayer.Services
                 }
 
 
-                var tokenResponse = await _tokenService.GenerateJwtToken(user, false, null);
+                var tokenResponse = await _tokenService.GenerateJwtToken(user, false, null, null);
                 return tokenResponse;
             }
             throw new ClientError(400, $"User registration failed");
         }
 
-        private async Task<AuthResultDto?> GetPrincipalFromExpiredToken(TokenRequestDto payload)
+        private async Task<AuthResultDto?> GetPrincipalFromExpiredToken(TokenRequestDto payload, string? organisationId)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
 
@@ -441,7 +451,8 @@ namespace BusinessLogicLayer.Services
             var authResult = await _tokenService.GenerateJwtToken(
                 user,
                 dbRefreshToken.StayLoggedIn,
-                dbRefreshToken
+                dbRefreshToken,
+                organisationId
             );
 
             return authResult;

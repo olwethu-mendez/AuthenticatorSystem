@@ -4,6 +4,7 @@ using DataAccessLayer.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccessLayer.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260307213939_tables-and-columns-for-multi-tenancy")]
+    partial class tablesandcolumnsformultitenancy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -162,12 +165,6 @@ namespace DataAccessLayer.Migrations
                         .IsRequired()
                         .HasColumnType("varchar(255)");
 
-                    b.Property<string>("ProjectImageName")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("ProjectImageUrl")
-                        .HasColumnType("longtext");
-
                     b.HasKey("Id");
 
                     b.HasIndex("OrganisationId");
@@ -264,9 +261,6 @@ namespace DataAccessLayer.Migrations
                     b.Property<bool?>("IsOrgAdmin")
                         .HasColumnType("tinyint(1)");
 
-                    b.Property<string>("OrganisationRole")
-                        .HasColumnType("longtext");
-
                     b.HasKey("ProfileId", "OrganisationId");
 
                     b.HasIndex("OrganisationId");
@@ -284,9 +278,6 @@ namespace DataAccessLayer.Migrations
 
                     b.Property<string>("OrganisationId")
                         .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("ProjectRole")
                         .HasColumnType("longtext");
 
                     b.HasKey("ProfileId", "ProjectId");

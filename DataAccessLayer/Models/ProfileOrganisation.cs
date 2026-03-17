@@ -15,6 +15,7 @@ namespace DataAccessLayer.Models
         public string OrganisationId { get; set; } = string.Empty;
         public bool? InvitationAccepted { get; set; }
         public bool? IsOrgAdmin { get; set; } = false;
+        public string? OrganisationRole { get; set; }
 
         public virtual Organisation? Organisation { get; set; }
         public virtual Profile? Profile { get; set; }

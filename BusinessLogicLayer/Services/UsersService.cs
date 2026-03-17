@@ -59,6 +59,30 @@ namespace BusinessLogicLayer.Services
                               ProfilePictureUrl = userProfile != null ? userProfile.ProfilePictureUrl : null,
                           }).ToListAsync();
         }
+        public async Task<GetUsersListDto?> GetUserById(string profileId)
+        {
+            return await (from user in _context.Users
+                          // This is a Left Join: User is the root, Profile is optional
+                          join profile in _context.Profiles on user.Id equals profile.UserId into profileGroup
+                          from userProfile in profileGroup.DefaultIfEmpty()
+
+                              // If you are filtering for a specific user, uncomment the next line:
+                              // where user.Id == userId 
+
+                          select new GetUsersListDto()
+                          {
+                              UserId = user.Id,
+                              ProfileId = userProfile.Id,
+                              FirstName = userProfile != null ? userProfile.FirstName : "N/A",
+                              LastName = userProfile != null ? userProfile.LastName : "N/A",
+                              Username = user.UserName,
+                              EmailConfirmed = user.EmailConfirmed,
+                              PhoneNumberConfirmed = user.PhoneNumberConfirmed,
+                              IsDeactivated = user.IsDeactivated,
+                              IsDeactivatedByAdmin = user.IsDeactivatedByAdmin,
+                              ProfilePictureUrl = userProfile != null ? userProfile.ProfilePictureUrl : null,
+                          }).FirstOrDefaultAsync(x=>x.ProfileId == profileId);
+        }
 
         public async Task<GetUserDto?> GetSingleUser(string userId)
         {
@@ -86,14 +110,14 @@ namespace BusinessLogicLayer.Services
                               Username = user.UserName,
                               EmailAddress = user.Email,
                               EmailConfirmed = user.EmailConfirmed,
-                              PhoneNumber =  !string.IsNullOrEmpty(user.PhoneNumber) ? user.CountryCode + user.PhoneNumber : null,
+                              PhoneNumber = !string.IsNullOrEmpty(user.PhoneNumber) ? user.CountryCode + user.PhoneNumber : null,
                               PhoneNumberConfirmed = user.PhoneNumberConfirmed,
                               IsDeactivated = user.IsDeactivated,
                               IsDeactivatedByAdmin = user.IsDeactivatedByAdmin,
                               DeactivatedAt = user.DeactivatedAt,
                               ProfilePictureUrl = userProfile != null ? userProfile.ProfilePictureUrl : null,
                               CreatedAt = user.CreatedAt
-                          }).FirstOrDefaultAsync(x=>x.UserId == userId);
+                          }).FirstOrDefaultAsync(x => x.UserId == userId);
         }
 
         public async Task<string> AdminDeactivatesUser(string accountUserId)
