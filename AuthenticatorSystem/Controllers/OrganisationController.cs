@@ -57,6 +57,15 @@ namespace AuthenticatorSystem.Controllers
             return Ok(result);
         }
 
+        [HttpGet("get-organisations")]
+        [Authorize(Policy = UserPolicies.MustHaveProfile)]
+        [Authorize(Policy = UserPolicies.MustBeActivated)]
+        public async Task<IActionResult> GetOrganisations()
+        {
+            var result = await _organisationService.GetOrganisations();
+            return Ok(result);
+        }
+
         [HttpGet("my-organisations")]
         [Authorize(Policy = UserPolicies.MustHaveProfile)]
         [Authorize(Policy = UserPolicies.MustBeActivated)]

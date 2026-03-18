@@ -36,12 +36,9 @@ namespace BusinessLogicLayer.Services
             var authClaims = new List<Claim>()
             {
                 new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
-                new Claim(ClaimTypes.GivenName, user.UserName ?? string.Empty),
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-                new Claim(JwtRegisteredClaimNames.Sub, user.Email ?? string.Empty),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-
             };
 
             var userRoles = await _userManager.GetRolesAsync(user!);
@@ -63,9 +60,11 @@ namespace BusinessLogicLayer.Services
                     new Claim("PhoneNumber", phoneNumber ?? string.Empty),
                 });
                 var userOrgs = await _context.ProfileOrganisations
+                    .IgnoreQueryFilters()
                     .Where(po => po.Profile.UserId == user.Id && po.InvitationAccepted == true)
                     .Select(po => po.OrganisationId)
                     .ToListAsync();
+
                 if (userOrgs.Count > 0)
                 {
                     foreach (var orgId in userOrgs)
@@ -73,11 +72,9 @@ namespace BusinessLogicLayer.Services
                         authClaims.Add(new Claim("MemberOfOrg", orgId));
                     }
 
-                    // Default active org = first one
-                    if (activeOrganisationId != null)
-                    {
-                        authClaims.Add(new Claim("ActiveOrgId", activeOrganisationId));
-                    }
+                    // FIX: If no specific ID was requested, pick the first one from the list
+                    var effectiveOrgId = activeOrganisationId ?? userOrgs.First();
+                    authClaims.Add(new Claim("ActiveOrgId", effectiveOrgId));
                 }
             }
             else hasProfile = false;

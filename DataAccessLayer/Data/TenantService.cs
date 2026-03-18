@@ -24,7 +24,7 @@ namespace DataAccessLayer.Data
                 .HttpContext?
                 .User?
                 .Claims?
-                .FirstOrDefault(c => c.Type == "ActiveOrg")
+                .FirstOrDefault(c => c.Type == "ActiveOrgId")
                 ?.Value;
             }
         }

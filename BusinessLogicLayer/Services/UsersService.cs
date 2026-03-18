@@ -154,6 +154,80 @@ namespace BusinessLogicLayer.Services
             }
         }
 
+        public async Task<List<GetUserLimitedDto>> GetUsersFiltered(
+            string? fullName,
+            string? email,
+            string? phoneNumber)
+        {
+            var userId = _contextAccessor.GetCurrentUserId();
+            if (userId == null) throw new ClientError(401, "User is not authenticated.");
+
+            var currentUser = await _userManager.FindByIdAsync(userId);
+            if (currentUser == null) throw new ClientError(400, "User not found or authenticated");
+
+            // Normalize inputs
+            fullName = fullName?.Trim();
+            email = email?.Trim();
+            phoneNumber = phoneNumber?.Trim();
+
+            string? firstName = null;
+            string? lastName = null;
+
+            // Split full name if provided
+            if (!string.IsNullOrEmpty(fullName))
+            {
+                var names = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                firstName = names.ElementAtOrDefault(0);
+                lastName = names.ElementAtOrDefault(1);
+            }
+
+            var query =
+                from user in _context.Users
+                join profile in _context.Profiles
+                    on user.Id equals profile.UserId into profileGroup
+                from userProfile in profileGroup.DefaultIfEmpty()
+                select new GetUserLimitedDto()
+                {
+                    UserId = user.Id,
+                    ProfileId = userProfile != null ? userProfile.Id : null,
+                    FirstName = userProfile != null ? userProfile.FirstName : "N/A",
+                    LastName = userProfile != null ? userProfile.LastName : "N/A",
+                    Username = user.UserName,
+                    EmailAddress = user.Email,
+                    EmailConfirmed = user.EmailConfirmed,
+                    PhoneNumber = user.PhoneNumber,
+                    PhoneNumberConfirmed = user.PhoneNumberConfirmed,
+                    IsDeactivated = user.IsDeactivated,
+                    IsDeactivatedByAdmin = user.IsDeactivatedByAdmin,
+                    ProfilePictureUrl = userProfile != null ? userProfile.ProfilePictureUrl : null,
+                };
+
+            // Apply filters dynamically
+            if (!string.IsNullOrEmpty(firstName))
+            {
+                query = query.Where(x => x.FirstName.Contains(firstName));
+            }
+
+            if (!string.IsNullOrEmpty(lastName))
+            {
+                query = query.Where(x => x.LastName.Contains(lastName));
+            }
+
+            if (!string.IsNullOrEmpty(email))
+            {
+                query = query.Where(x =>
+                    x.EmailConfirmed == true && x.EmailAddress == email);
+            }
+
+            if (!string.IsNullOrEmpty(phoneNumber))
+            {
+                query = query.Where(x =>
+                    x.PhoneNumberConfirmed == true && x.PhoneNumber == phoneNumber);
+            }
+
+            return await query.ToListAsync();
+        }
+
         public async Task CreateUser(CreateUserDto payload)
         {
             var userId = _contextAccessor.GetCurrentUserId();

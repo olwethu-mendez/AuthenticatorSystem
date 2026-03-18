@@ -35,6 +35,14 @@ namespace AuthenticatorSystem.Controllers
             return Ok(result);
         }
 
+        [HttpGet("users-filter")]
+        [Authorize(Roles = UserRoles.OrgAdmin)]
+        public async Task<IActionResult> GetFilteredUsers([FromQuery] string? fullName, string? email, string? phoneNumber)
+        {
+            var result = await _usersService.GetUsersFiltered(fullName, email, phoneNumber);
+            return Ok(result);
+        }
+
         [HttpGet("{userId}")]
         public async Task<IActionResult> GetSingleUser(string userId)
         {

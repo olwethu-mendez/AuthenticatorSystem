@@ -13,6 +13,7 @@ namespace BusinessLogicLayer.Interfaces
         Task<GetUserDto?> GetSingleUser(string profileId);
         Task<List<GetUsersListDto>> GetAllUsers();
         Task<GetUsersListDto?> GetUserById(string profileId);
+        Task<List<GetUserLimitedDto>> GetUsersFiltered(string? fullName, string? email, string? phoneNumber);
         Task<string> AdminDeactivatesUser(string accountUserId);
         Task CreateUser(CreateUserDto payload);
     }

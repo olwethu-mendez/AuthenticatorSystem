@@ -1,4 +1,5 @@
 ﻿using AuthenticatorSystem.Infrastructure;
+using BusinessLogicLayer.Helper;
 using BusinessLogicLayer.Hubs;
 using BusinessLogicLayer.Interfaces;
 using BusinessLogicLayer.Middleware;
@@ -27,6 +28,7 @@ builder.Services.AddScoped<IProjectServices, ProjectService>();
 builder.Services.AddScoped<ContextAccessorService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<R2Service>();
+builder.Services.AddScoped<PhoneEmailIdentifierHelper>();
 
 builder.Services.AddSingleton<ISmsService, TwilioSmsService>();
 builder.Services.AddSingleton<IEmailService, MailtrapService>();
